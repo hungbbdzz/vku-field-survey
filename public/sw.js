@@ -3,7 +3,7 @@
 // Plain JS — no bundler, no Workbox. Explicit for report clarity.
 // =========================================================
 
-const CACHE_NAME = 'vku-survey-v6';
+const CACHE_NAME = 'vku-survey-v7';
 const SYNC_TAG = 'sync-submissions';
 
 const APP_SHELL = [
