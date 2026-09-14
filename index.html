@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+
+    <!-- SEO -->
+    <title>VKU Field Survey — Kiểm tra cơ sở vật chất</title>
+    <meta name="description" content="Ứng dụng kiểm tra cơ sở vật chất offline-first cho kiểm tra viên VKU. Hỗ trợ phòng học, máy chiếu, điều hòa và hệ thống điện." />
+    <meta name="keywords" content="VKU, kiểm tra, cơ sở vật chất, offline, PWA, inspection" />
+    <meta name="author" content="VKU" />
+    <meta name="robots" content="noindex, nofollow" />
+
+    <!-- PWA -->
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#0284c7" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Field Survey" />
+    <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+
+    <!-- Icons -->
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png" />
+    <link rel="icon" type="image/png" sizes="512x512" href="/icons/icon-512.png" />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="VKU Field Survey" />
+    <meta property="og:description" content="Offline-first campus facility inspection app" />
+    <meta property="og:image" content="/icons/icon-512.png" />
+  </head>
+  <body>
+    <div id="app">
+      <!-- App shell rendered by JS -->
+      <noscript>
+        <div style="padding:2rem;text-align:center;color:#0284c7;font-family:sans-serif">
+          <h1>VKU Field Survey</h1>
+          <p>Vui lòng bật JavaScript để sử dụng ứng dụng.</p>
+        </div>
+      </noscript>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
