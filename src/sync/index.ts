@@ -9,6 +9,7 @@
 
 import {
   getPendingSubmissions,
+  getSubmission,
   markSubmissionSynced,
   Submission,
 } from '../db';
@@ -40,16 +41,25 @@ export async function registerBackgroundSync(): Promise<void> {
 // ── Main flush function ──────────────────────────────────────
 // Sequential loop (for...of + await) — stops on first failure
 // to avoid an inconsistent queue state.
-export async function flushPendingSubmissions(): Promise<void> {
+export async function flushPendingSubmissions(): Promise<{ synced: number; total: number }> {
+  if (!navigator.onLine) {
+    console.info('[Sync] Offline: cannot flush pending queue right now');
+    return { synced: 0, total: 0 };
+  }
+
   const pending = await getPendingSubmissions();
-  if (pending.length === 0) return;
+  if (pending.length === 0) return { synced: 0, total: 0 };
 
   console.info(`[Sync] Flushing ${pending.length} pending submission(s)`);
+  window.dispatchEvent(new CustomEvent('sync-started', { detail: { count: pending.length } }));
+
+  let syncedCount = 0;
 
   for (const record of pending) {
     try {
       await dispatchSubmission(record);
       await markSubmissionSynced(record.id);
+      syncedCount++;
       console.info('[Sync] Synced:', record.id);
       // Notify UI
       window.dispatchEvent(
@@ -60,6 +70,12 @@ export async function flushPendingSubmissions(): Promise<void> {
       break; // Do not continue — retry on next online event
     }
   }
+
+  window.dispatchEvent(
+    new CustomEvent('sync-completed', { detail: { synced: syncedCount, total: pending.length } })
+  );
+
+  return { synced: syncedCount, total: pending.length };
 }
 
 // ── HTTP dispatch ────────────────────────────────────────────
@@ -73,6 +89,20 @@ async function dispatchSubmission(record: Submission): Promise<void> {
   body.append('category', record.category);
   body.append('rating', String(record.rating));
   body.append('notes', record.notes ?? '');
+
+  if (record.priority) {
+    body.append('priority', record.priority);
+  }
+  if (record.tags && record.tags.length > 0) {
+    body.append('tags', JSON.stringify(record.tags));
+  }
+  if (record.inspector) {
+    body.append('inspector', record.inspector);
+  }
+  if (record.location) {
+    body.append('latitude', String(record.location.latitude));
+    body.append('longitude', String(record.location.longitude));
+  }
 
   if (record.photo instanceof Blob) {
     body.append('photo', record.photo, `photo-${record.id}.jpg`);
@@ -91,4 +121,23 @@ export function setupOnlineListener(): void {
     console.info('[Sync] Network restored — flushing queue');
     flushPendingSubmissions();
   });
+}
+
+// ── Sync individual submission on user demand ────────────────
+export async function syncSingleSubmission(id: string): Promise<boolean> {
+  if (!navigator.onLine) return false;
+  const sub = await getSubmission(id);
+  if (!sub || sub.status !== 'PENDING_SYNC') return false;
+
+  try {
+    await dispatchSubmission(sub);
+    await markSubmissionSynced(sub.id);
+    window.dispatchEvent(
+      new CustomEvent('submission-synced', { detail: { id: sub.id } })
+    );
+    return true;
+  } catch (err) {
+    console.error('[Sync] Single sync failed:', err);
+    return false;
+  }
 }

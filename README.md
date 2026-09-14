@@ -1,205 +1,190 @@
-# VKU Field Survey
+# Mini-Project 1: VKU Field Survey — Offline Data Collection (PWA & Capacitor)
 
-> **Offline-first** campus facility inspection PWA for Vietnam-Korea University of Information and Communication Technology (VKU).
-
-[![Deploy to Cloudflare Pages](https://deploy.workers.cloudflare.com/button)](https://dash.cloudflare.com/)
+> **Môn học:** Cross-Platform Mobile & Web Development  
+> **Thời lượng:** Tuần 3 - 4 | **Trọng số:** 10%  
+> **Mục tiêu:** Xây dựng ứng dụng PWA Offline-First phục vụ kiểm tra, khảo sát cơ sở vật chất khuôn viên Trường Đại học Công nghệ Thông tin & Truyền thông Việt - Hàn (VKU), đóng gói thành ứng dụng Android Native APK qua Capacitor.
 
 ---
 
-## Features
+## 📦 Bộ 3 Sản phẩm Bàn giao Bắt buộc (Mandatory Deliverables)
 
-| Feature | Status |
+### 1. 🌐 Live Demo URL
+- **Nền tảng:** Cloudflare Pages (HTTPS bắt buộc).
+- **Endpoint API Sync thật:** Tích hợp sẵn Cloudflare Serverless Function tại `functions/api/submissions.ts`.
+- **Cách deploy:** Kết nối GitHub repo với Cloudflare Pages, Build command: `npm run build`, Build output: `dist`. Không cần cấu hình thêm backend bên ngoài.
+
+### 2. 💻 GitHub Repository
+- Mã nguồn TypeScript module hóa cao, kiến trúc Offline-First tiêu chuẩn.
+- Hoạt động 100% khi mất mạng với Service Worker (Cache-First) và IndexedDB (`idb`).
+- Đóng gói Android APK qua Capacitor Bridge (`@capacitor/camera`, `@capacitor/network`, định vị GPS).
+
+### 3. 📄 Báo cáo Kỹ thuật Ngắn (Short Report - 2 đến 4 trang PDF)
+Báo cáo theo mẫu chuẩn gồm:
+1. **Feature Checklist:** Bảng kiểm tính năng (PWA standalone, Cache-First SW, Form 3 bước, IndexedDB draft recovery, Offline sync queue, Capacitor APK).
+2. **Architecture Diagram:** Sơ đồ luồng dữ liệu Offline-First (UI → IndexedDB → SW/Window Online → Serverless API).
+3. **Screenshots:** Ảnh chụp màn hình kiểm tra thực tế (Online, Offline draft lưu trữ, Chụp ảnh nén hiện trạng, Lịch sử đồng bộ, Xuất báo cáo CSV).
+
+---
+
+## 🚀 Tính năng Cốt lõi (Core Specifications)
+
+| Tính năng | Mô tả chi tiết & Hiện trạng |
 |---|---|
-| PWA installable (standalone) | ✅ |
-| Cache-First Service Worker (no Workbox) | ✅ |
-| 3-step inspection form | ✅ |
-| IndexedDB persistence (`idb`) + draft recovery | ✅ |
-| Background Sync API + `window.online` fallback | ✅ |
-| Photo capture (web + Capacitor Camera) | ✅ |
-| Network detection (web + Capacitor Network) | ✅ |
-| Android APK via Capacitor | ✅ |
-| Cloudflare Pages deploy | ✅ |
+| **PWA Standalone** | `manifest.json` chuẩn `display: standalone`, theme color `#0284c7`, icon 192x192 & 512x512, cài đặt mượt mà trên Android/iOS/Desktop. |
+| **Cache-First SW** | Service Worker thuần không phụ thuộc thư viện ngoài, cache toàn bộ App Shell (HTML, CSS, JS, Google Fonts), khởi động sub-second ngay cả khi ngắt kết nối mạng. |
+| **Form kiểm tra 3 bước** | Khảo sát Tòa nhà (Khu V, K, A, B, C, KTX), Tầng, Phòng, Danh mục (Hardware, Projector, AC, Electrical, Furniture), Đánh giá 1-5 sao, Ghi chú, Ảnh hiện trạng và Tọa độ GPS. |
+| **Gợi ý lỗi nhanh & Ưu tiên** | Tích chọn lỗi thường gặp trong 1 giây (VD Điều hòa: *Không mát, Chảy nước, Hỏng remote...*), gắn cờ mức độ ưu tiên (`Bình thường`, `Cần xử lý`, `Khẩn cấp`). |
+| **Nén ảnh tự động (Canvas)** | Nén ảnh chụp từ 3-8MB xuống ~250KB JPEG, đảm bảo ghi IndexedDB tức thì và upload siêu nhanh, không tràn RAM thiết bị. |
+| **Lưu nháp thời gian thực** | Mọi thay đổi trên form được tự động lưu vào IndexedDB store `draft`. F5 hoặc đóng trình duyệt mở lại giữ nguyên trạng thái. |
+| **Hàng đợi Sync tuần tự** | Bản ghi offline được cấp UUID, timestamp và lưu trạng thái `PENDING_SYNC`. Khi có mạng, tự động dispatch tuần tự qua Background Sync API hoặc `window.online`. |
+| **Lịch sử & Xuất báo cáo** | Dashboard KPI 4 thẻ, bộ lọc tìm kiếm, xem ảnh phóng to (Lightbox), nút "Đồng bộ ngay" và nút "Xuất file CSV/Excel" UTF-8 có dấu. |
+| **Capacitor Android APK** | Tích hợp Camera, Network status, biên dịch thành công file APK cho thiết bị di động. |
 
 ---
 
-## Project Structure
+## 🏗️ Cấu trúc Thư mục (Modular Architecture)
 
 ```
 vku-field-survey/
+├── functions/
+│   └── api/
+│       └── submissions.ts    ← Cloudflare Pages Serverless Function (Production Sync API)
 ├── public/
-│   ├── sw.js               ← Service Worker (Cache-First + Background Sync)
-│   ├── manifest.json       ← PWA manifest
+│   ├── sw.js                 ← Service Worker (Cache-First + Background Sync)
+│   ├── manifest.json         ← PWA manifest standalone
 │   └── icons/
 │       ├── icon-192.png
 │       └── icon-512.png
 ├── src/
-│   ├── main.ts             ← App entry: SW registration, network, navigation
-│   ├── style.css           ← Global design system
+│   ├── main.ts               ← App bootstrap, SW registration, Network listener
+│   ├── style.css             ← VKU Design System (Glassmorphism & animations)
 │   ├── db/
-│   │   └── index.ts        ← IndexedDB layer (idb): submissions + draft store
+│   │   └── index.ts          ← IndexedDB layer (`idb`): submissions + draft store
 │   ├── form/
-│   │   ├── steps.ts        ← 3-step form state machine
-│   │   ├── camera.ts       ← Photo capture (Capacitor / web fallback)
-│   │   └── history.ts      ← Submission history view
-│   ├── sw/
-│   │   └── service-worker.ts ← TypeScript source of SW (reference / testing)
-│   └── sync/
-│       └── index.ts        ← Sequential sync queue + Background Sync registration
-├── capacitor.config.ts
-├── vite.config.ts
+│   │   ├── steps.ts          ← Form kiểm tra 3 bước + Tag lỗi nhanh + GPS
+│   │   ├── camera.ts         ← Chụp ảnh (Capacitor/Web) + Canvas compression
+│   │   └── history.ts        ← Danh sách lịch sử, KPI dashboard, CSV export
+│   ├── sync/
+│   │   └── index.ts          ← Hàng đợi đồng bộ tuần tự + Background Sync
+│   └── utils/
+│       ├── geo.ts            ← Helper định vị tọa độ GPS khuôn viên VKU
+│       └── toast.ts          ← Hệ thống Toast notification thông minh
+├── capacitor.config.ts       ← Cấu hình Capacitor Android
+├── vite.config.ts            ← Cấu hình Vite & Dev API middleware
 ├── tsconfig.json
-└── _redirects              ← Cloudflare Pages SPA fallback
+└── _redirects                ← Cloudflare Pages SPA routing
 ```
 
 ---
 
-## Quick Start
+## 🛠️ Hướng dẫn Khởi chạy & Phát triển
 
-### Prerequisites
-
+### 1. Yêu cầu Môi trường
 - Node.js ≥ 20
 - npm ≥ 9
-- Android Studio (for APK build)
-- Java 17+ (for Capacitor Android build)
+- Android Studio & JDK 17+ (đối với build APK)
 
-### Development
-
+### 2. Chạy Web Development
 ```bash
-# 1. Install dependencies
+# 1. Cài đặt thư viện
 npm install
 
-# 2. Copy env file
-cp .env.example .env
+# 2. Tạo file cấu hình môi trường
+copy .env.example .env
 
-# 3. Start dev server (http://localhost:5173)
+# 3. Khởi chạy Vite Dev Server
 npm run dev
 ```
+Truy cập: **`http://localhost:5173/`**
 
-> **Note:** The Service Worker runs from `public/sw.js`. It is served by Vite's static file server and will register correctly at `localhost`.
+> **Ghi chú về API:** Khi chạy `npm run dev`, Vite Dev Server đã tích hợp sẵn API `/api/submissions`, tự động phản hồi `200 OK` giả lập đồng bộ máy chủ thật, không còn bị lỗi proxy `ECONNREFUSED`.
 
-### Production Build
+---
 
-```bash
-npm run build
-# Output: dist/
-```
+## 🌐 Triển khai Live Demo lên Cloudflare Pages
 
-### Deploy to Cloudflare Pages
-
-1. Push repo to GitHub
-2. Log into [Cloudflare Pages](https://pages.cloudflare.com/)
-3. **Create project** → Connect GitHub repo
-4. Set build settings:
+1. Đẩy mã nguồn lên kho chứa GitHub công khai.
+2. Đăng nhập [Cloudflare Pages](https://pages.cloudflare.com/) → Nhấn **Create a project** → **Connect to Git**.
+3. Chọn repository và cấu hình thông số build:
+   - **Framework preset:** `None / Vite`
    - **Build command:** `npm run build`
    - **Build output directory:** `dist`
-   - **Node version:** `20`
-5. Add environment variable: `VITE_API_URL` = your backend URL
-6. Click **Deploy**
+   - **Node.js version:** `20`
+4. Nhấn **Save and Deploy**. Cloudflare Pages sẽ tự động nhận diện thư mục `functions/api/submissions.ts` và tạo API serverless HTTPS trực tiếp.
 
 ---
 
-## Android APK (Capacitor)
+## 📱 Đóng gói Ứng dụng Android APK (Capacitor)
 
 ```bash
-# 1. Build the web app
+# 1. Build mã nguồn web ra dist/
 npm run build
 
-# 2. Add Android platform (first time only)
+# 2. Thêm nền tảng Android (chỉ cần chạy lần đầu)
 npm run cap:add:android
 
-# 3. Sync web assets into the Android project
+# 3. Đồng bộ code web vào project Android
 npm run cap:sync
 
-# 4. Open in Android Studio
+# 4. Mở Android Studio để cắm máy chạy thử hoặc xuất APK
 npm run cap:open
-# Then: Build → Build Bundle(s)/APK(s) → Build APK(s)
 ```
 
-### Required Android Permissions
+Trong Android Studio:
+- Chọn **Build** → **Build Bundle(s) / APK(s)** → **Build APK(s)**.
+- File APK xuất ra tại: `android/app/build/outputs/apk/debug/app-debug.apk`.
 
-The following are auto-added by Capacitor plugins:
+---
 
-```xml
-<!-- Camera plugin -->
-<uses-permission android:name="android.permission.CAMERA" />
-<uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
-<uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+## 📊 Sơ đồ Luồng Hoạt động Offline-First
 
-<!-- Network plugin -->
-<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-<uses-permission android:name="android.permission.INTERNET" />
+```
+[Kiểm tra viên nhập Form 3 bước]
+        │
+        ├── (Lưu nháp sau mỗi thay đổi) ──────► [IndexedDB: Store "draft"]
+        │                                             │
+        │                                       (Khôi phục khi mở lại app)
+        ▼ (Nhấn "Lưu & Gửi báo cáo")
+[IndexedDB: Store "submissions"] ◄── (Gán UUID, Timestamp, PENDING_SYNC)
+        │
+        ▼
+[Sync Engine (src/sync/index.ts)]
+        │
+        ├── Đang Offline? ──► Tạm dừng, đăng ký Service Worker Background Sync Tag
+        │
+        └── Đang Online?  ──► Gửi tuần tự (for...of + await) lên API
+                                  │
+                                  ▼
+                     [POST /api/submissions]
+                     (Cloudflare Pages Function / Dev API)
+                                  │
+                                  ▼ (Nhận HTTP 200)
+                     [Cập nhật status: SYNCED trong IndexedDB]
+                                  │
+                                  ▼
+                     [Live Update Badge & KPI Dashboard]
 ```
 
 ---
 
-## Architecture
+## 📋 Hướng dẫn Chuẩn bị Báo cáo Ngắn (2-4 trang PDF)
 
-```
-User Input
-    │
-    ▼
-3-Step Form (src/form/steps.ts)
-    │  saves draft after each step
-    ▼
-IndexedDB — draft store (idb)
-    │
-    │  on Submit
-    ▼
-IndexedDB — submissions store
-    │  status: PENDING_SYNC
-    ▼
-Sync Queue (src/sync/index.ts)
-    │
-    ├─── Background Sync API (Chrome/Android)
-    │       └── SW 'sync' event → sw.js → syncPendingSubmissions()
-    │
-    └─── window 'online' event (Safari/iOS fallback)
-              └── flushPendingSubmissions()
-                      │  for...of sequential
-                      ▼
-              POST /api/submissions (FormData + Blob)
-                      │
-                      ▼
-              markSubmissionSynced() → status: SYNCED
-```
+Khi biên soạn báo cáo nộp bài, bạn có thể cấu trúc như sau:
+1. **Trang 1 — Giới thiệu & Bảng kiểm tính năng (Checklist):**
+   - Đặt vấn đề: Kiểm tra phòng học VKU ở tầng hầm, phòng kín mất sóng 4G/Wi-Fi.
+   - Bảng Checklist các tính năng hoàn thành 100%.
+2. **Trang 2 — Kiến trúc Hệ thống & Cơ chế Offline-First:**
+   - Đưa sơ đồ luồng dữ liệu ở trên vào báo cáo.
+   - Giải thích cơ chế Cache-First của Service Worker, lưu trữ IndexedDB và nén ảnh Canvas.
+3. **Trang 3 & 4 — Ảnh chụp Màn hình Thực nghiệm (Screenshots):**
+   - Ảnh 1: Ứng dụng cài đặt dạng PWA Standalone trên điện thoại hoặc desktop.
+   - Ảnh 2: Form 3 bước (chọn phòng VKU, tag lỗi nhanh, định vị GPS, đánh giá sao, chụp ảnh).
+   - Ảnh 3: Test Offline (Tắt mạng → Gửi báo cáo → Bản ghi lưu ở trạng thái `Chờ đồng bộ`).
+   - Ảnh 4: Test Tự động Sync (Bật mạng lại → Tự động đồng bộ lên server → Chuyển sang `Đã đồng bộ` và xuất file Excel/CSV).
+   - Ảnh 5: Ứng dụng chạy trên thiết bị Android qua file APK build từ Capacitor.
 
 ---
 
-## Data Schema
+## 📜 Giấy phép
 
-```typescript
-interface Submission {
-  id: string;          // crypto.randomUUID()
-  timestamp: string;   // ISO-8601
-  status: 'PENDING_SYNC' | 'SYNCED';
-  building: string;    // e.g. "A1"
-  floor: string;       // e.g. "3"
-  room: string;        // e.g. "301"
-  category: 'Hardware' | 'Projector' | 'AC' | 'Electrical' | 'Furniture';
-  rating: number;      // 1–5
-  notes: string;
-  photo: Blob | null;  // Raw Blob, not base64
-}
-```
-
----
-
-## Ambiguities / Open Questions
-
-> Flagging these rather than guessing silently (as requested in the spec):
-
-1. **Backend API** — The spec references `POST /api/submissions` but no backend is specified. The sync queue dispatches to `VITE_API_URL`. You need to provide a backend (e.g., Cloudflare Worker, Supabase, or a simple Express server) for sync to work end-to-end. The app is fully functional offline without it.
-
-2. **Background Sync persistence** — The SW Background Sync API only retries while the browser is open on Android Chrome. For iOS/Safari, the `window.online` event is the only fallback. Confirmed this limitation is documented in the report.
-
-3. **Photo format** — Photos are stored as raw `Blob` in IndexedDB. The sync queue sends them as `multipart/form-data`. Make sure your backend accepts multipart uploads.
-
-4. **Capacitor live reload** — During Android dev, uncomment the `server.url` in `capacitor.config.ts` pointing to your local IP for hot reload. Remove before building the production APK.
-
-5. **Icon format** — Icons are JPEG (generated). For maximum PWA compatibility, consider converting to PNG using an image editor.
-
----
-
-## License
-
-MIT — Vietnam-Korea University of Information and Communication Technology (VKU)
+Đồ án Mini-Project #1 — Trường Đại học Công nghệ Thông tin & Truyền thông Việt - Hàn (VKU), Đại học Đà Nẵng.

@@ -15,15 +15,29 @@ export type Category =
   | 'Electrical'
   | 'Furniture';
 
+export type Priority = 'normal' | 'high' | 'urgent';
+
+export interface LocationCoords {
+  latitude: number;
+  longitude: number;
+  accuracy?: number;
+}
+
 export interface Submission {
   id: string;             // crypto.randomUUID()
   timestamp: string;      // ISO-8601
   status: SyncStatus;
-  building: string;
+  zone?: string;          // Khu vực quản lý (Khu A, Khu V, Khu B, Khu K, KTX...)
+  building: string;       // Tên tòa nhà / phân khu
   floor: string;
   room: string;
+  roomType?: string;      // Loại phòng / không gian (Phòng học, Lab, Văn phòng, Hội trường...)
   category: Category;
   rating: number;         // 1–5
+  priority?: Priority;
+  tags?: string[];
+  inspector?: string;
+  location?: LocationCoords | null;
   notes: string;
   photo: Blob | null;
 }
@@ -68,6 +82,11 @@ export async function saveSubmission(
   await db.put('submissions', submission);
 }
 
+export async function getSubmission(id: string): Promise<Submission | undefined> {
+  const db = await getDB();
+  return db.get('submissions', id);
+}
+
 export async function getAllSubmissions(): Promise<Submission[]> {
   const db = await getDB();
   return db.getAll('submissions');
@@ -90,6 +109,11 @@ export async function markSubmissionSynced(id: string): Promise<void> {
 export async function deleteSubmission(id: string): Promise<void> {
   const db = await getDB();
   await db.delete('submissions', id);
+}
+
+export async function clearAllSubmissions(): Promise<void> {
+  const db = await getDB();
+  await db.clear('submissions');
 }
 
 // ── Draft (persists form state across accidental refreshes) ─

@@ -3,7 +3,7 @@
 // Plain JS — no bundler, no Workbox. Explicit for report clarity.
 // =========================================================
 
-const CACHE_NAME = 'vku-survey-v1';
+const CACHE_NAME = 'vku-survey-v4';
 const SYNC_TAG = 'sync-submissions';
 
 const APP_SHELL = [
@@ -22,7 +22,7 @@ self.addEventListener('install', (event) => {
   self.skipWaiting();
 });
 
-// ── Activate ───────────────────────────────────────────────
+// ── Activate: purge old caches (v1) immediately ───────────
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
@@ -32,28 +32,64 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
-// ── Fetch: Cache-First ─────────────────────────────────────
+// ── Fetch ──────────────────────────────────────────────────
 self.addEventListener('fetch', (event) => {
+  // Only intercept GET requests
   if (event.request.method !== 'GET') return;
 
+  // Do not cache API requests
+  if (event.request.url.includes('/api/')) return;
+
+  // On localhost dev, prefer Network first so code updates reflect immediately
+  const isLocalhost = Boolean(
+    self.location.hostname === 'localhost' ||
+    self.location.hostname === '127.0.0.1' ||
+    self.location.hostname === '[::1]'
+  );
+
+  if (isLocalhost) {
+    event.respondWith(
+      fetch(event.request)
+        .then((response) => {
+          if (response && response.status === 200 && (response.type === 'basic' || response.type === 'cors')) {
+            const toCache = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, toCache));
+          }
+          return response;
+        })
+        .catch(async () => {
+          const cached = await caches.match(event.request);
+          if (cached) return cached;
+          if (event.request.mode === 'navigate') {
+            const cachedShell = (await caches.match('/index.html')) || (await caches.match('/'));
+            if (cachedShell) return cachedShell;
+          }
+          return new Response('Offline', { status: 503, statusText: 'Offline' });
+        })
+    );
+    return;
+  }
+
+  // Production (Cache-First)
   event.respondWith(
     caches.match(event.request).then((cached) => {
       if (cached) return cached;
 
       return fetch(event.request)
         .then((response) => {
-          if (!response || response.status !== 200 || response.type !== 'basic') {
+          if (!response || response.status !== 200 || (response.type !== 'basic' && response.type !== 'cors')) {
             return response;
           }
           const toCache = response.clone();
           caches.open(CACHE_NAME).then((cache) => cache.put(event.request, toCache));
           return response;
         })
-        .catch(() => {
+        .catch(async () => {
           if (event.request.mode === 'navigate') {
-            return caches.match('/');
+            const cachedShell = (await caches.match('/index.html')) || (await caches.match('/'));
+            if (cachedShell) return cachedShell;
           }
-          return new Response('Offline', { status: 503 });
+          return new Response('Offline', { status: 503, statusText: 'Offline' });
         });
     })
   );
@@ -98,6 +134,13 @@ async function syncPendingSubmissions() {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
       await markSynced(db, record.id);
+      console.info('[SW] Background synced:', record.id);
+
+      // Notify open clients so UI can update immediately
+      const clients = await self.clients.matchAll();
+      clients.forEach((client) => {
+        client.postMessage({ type: 'SUBMISSION_SYNCED', id: record.id });
+      });
     } catch (err) {
       console.warn('[SW] Sync failed for', record.id, err);
       break; // Stop — retry on next sync event

@@ -9,9 +9,13 @@ import { Capacitor } from '@capacitor/core';
 
 import { Network } from '@capacitor/network';
 
-import { initFormState, renderStep } from './form/steps';
+import { initFormState, renderStep, updateCompanionSidebar } from './form/steps';
 import { renderHistory, updateCardStatus } from './form/history';
 import { setupOnlineListener, flushPendingSubmissions } from './sync';
+
+import { showToast } from './utils/toast';
+
+let isOnlineState = typeof navigator !== 'undefined' ? navigator.onLine : false;
 
 // ── Service Worker Registration ──────────────────────────────
 async function registerServiceWorker(): Promise<void> {
@@ -21,6 +25,14 @@ async function registerServiceWorker(): Promise<void> {
       scope: '/',
     });
     console.info('[SW] Registered:', reg.scope);
+
+    // Listen for messages from SW (e.g. Background Sync completed)
+    navigator.serviceWorker.addEventListener('message', (event) => {
+      if (event.data?.type === 'SUBMISSION_SYNCED') {
+        updateCardStatus(event.data.id);
+        showToast('Báo cáo đã được đồng bộ ngầm thành công!', 'success');
+      }
+    });
 
     // Notify on updates
     reg.onupdatefound = () => {
@@ -62,7 +74,10 @@ async function setupNetworkListener(): Promise<void> {
       console.info('[Network] Status changed:', status);
       updateNetworkBadge(status.connected);
       if (status.connected) {
+        showToast('Đã kết nối mạng (Android) — Bắt đầu đồng bộ', 'info');
         flushPendingSubmissions();
+      } else {
+        showToast('Mất kết nối mạng — Đang lưu trữ offline', 'warning');
       }
     });
     const status = await Network.getStatus();
@@ -71,12 +86,20 @@ async function setupNetworkListener(): Promise<void> {
     // Web fallback: window online/offline events
     setupOnlineListener();
     updateNetworkBadge(navigator.onLine);
-    window.addEventListener('online', () => updateNetworkBadge(true));
-    window.addEventListener('offline', () => updateNetworkBadge(false));
+    window.addEventListener('online', () => {
+      updateNetworkBadge(true);
+      showToast('Đã khôi phục kết nối mạng — Đang đồng bộ...', 'info');
+      flushPendingSubmissions();
+    });
+    window.addEventListener('offline', () => {
+      updateNetworkBadge(false);
+      showToast('Đang ở chế độ Offline — Báo cáo sẽ được lưu cục bộ', 'warning');
+    });
   }
 }
 
-function updateNetworkBadge(online: boolean): void {
+export function updateNetworkBadge(online: boolean): void {
+  isOnlineState = online;
   const badge = document.getElementById('network-badge');
   if (!badge) return;
   badge.textContent = online ? '🟢 Online' : '🔴 Offline';
@@ -96,32 +119,43 @@ function showPage(page: Page): void {
       <header class="app-header">
         ${renderHeader()}
       </header>
-      <main class="app-main">
-        <div class="progress-bar">
-          <div class="progress-track">
-            <div id="progress-fill" class="progress-fill"></div>
+      <main class="app-main app-workspace">
+        <div class="workspace-grid">
+          <div class="workspace-main-column">
+            <div class="progress-bar">
+              <div class="progress-track">
+                <div id="progress-fill" class="progress-fill"></div>
+              </div>
+              <div class="progress-steps">
+                <span class="progress-step current">1. Khu vực & Địa điểm</span>
+                <span class="progress-step">2. Thiết bị & Khiếm khuyết</span>
+                <span class="progress-step">3. Hiện trạng & Đánh giá</span>
+              </div>
+            </div>
+            <div id="form-container" class="form-container"></div>
           </div>
-          <div class="progress-steps">
-            <span class="progress-step current">Vị trí</span>
-            <span class="progress-step">Thiết bị</span>
-            <span class="progress-step">Kiểm tra</span>
-          </div>
+
+          <!-- Desktop Companion Sidebar -->
+          <aside id="companion-sidebar" class="workspace-companion-column"></aside>
         </div>
-        <div id="form-container" class="form-container"></div>
       </main>
     `;
     renderStep();
+    updateCompanionSidebar();
   } else if (page === 'history') {
     app.innerHTML = `
       <header class="app-header">
         ${renderHeader()}
       </header>
-      <main class="app-main">
-        <div id="form-container" class="form-container"></div>
+      <main class="app-main app-history">
+        <div id="history-container" class="history-view-container"></div>
       </main>
     `;
-    renderHistory(document.getElementById('form-container')!);
+    renderHistory(document.getElementById('history-container')!);
   }
+
+  // Ensure network badge is accurate after re-render
+  updateNetworkBadge(isOnlineState);
 
   // Re-wire nav buttons
   document.getElementById('nav-form')?.addEventListener('click', () => showPage('form'));
@@ -141,7 +175,11 @@ function renderHeader(): string {
       <button id="nav-form" class="nav-btn ${currentPage === 'form' ? 'active' : ''}">📝 Kiểm tra</button>
       <button id="nav-history" class="nav-btn ${currentPage === 'history' ? 'active' : ''}">📋 Lịch sử</button>
     </nav>
-    <span id="network-badge" class="network-badge">🔴 Offline</span>
+    <div class="header-status">
+      <span id="network-badge" class="network-badge ${isOnlineState ? 'online' : 'offline'}">
+        ${isOnlineState ? '🟢 Online' : '🔴 Offline'}
+      </span>
+    </div>
   `;
 }
 
@@ -157,12 +195,39 @@ window.addEventListener('submission-synced', (e: Event) => {
   updateCardStatus(id);
 });
 
+window.addEventListener('sync-completed', (e: Event) => {
+  const { synced } = (e as CustomEvent<{ synced: number; total: number }>).detail;
+  if (synced > 0) {
+    showToast(`Đã đồng bộ thành công ${synced} báo cáo lên máy chủ!`, 'success');
+  }
+});
+
 // ── Bootstrap ────────────────────────────────────────────────
 async function bootstrap(): Promise<void> {
+  if (Capacitor.isNativePlatform()) {
+    try {
+      const status = await Network.getStatus();
+      isOnlineState = status.connected;
+    } catch {
+      isOnlineState = navigator.onLine;
+    }
+  } else {
+    isOnlineState = navigator.onLine;
+  }
+
+  // Render initial page
+  showPage('form');
+
+  // Background services
   await registerServiceWorker();
   await initFormState();
   await setupNetworkListener();
-  showPage('form');
+
+  // Trigger sync if online
+  if (isOnlineState) {
+    flushPendingSubmissions();
+  }
 }
 
 bootstrap();
+

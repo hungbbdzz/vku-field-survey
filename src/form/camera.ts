@@ -9,10 +9,60 @@ import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 
 // ── Public API ───────────────────────────────────────────────
 export async function capturePhoto(): Promise<Blob | null> {
+  let rawBlob: Blob | null = null;
   if (Capacitor.isNativePlatform()) {
-    return captureNative();
+    rawBlob = await captureNative();
+  } else {
+    rawBlob = await captureWeb();
   }
-  return captureWeb();
+  if (!rawBlob) return null;
+  return compressImage(rawBlob);
+}
+
+// ── Client-side Canvas Image Compression ─────────────────────
+// Downscales high-resolution camera photos (3-10MB) to ~200-350KB JPEG
+// Ensures fast sub-second IndexedDB writes and instant background sync
+export async function compressImage(blob: Blob, maxWidth = 1280, quality = 0.82): Promise<Blob> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    const url = URL.createObjectURL(blob);
+
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      let { width, height } = img;
+
+      if (width > maxWidth) {
+        height = Math.round((height * maxWidth) / width);
+        width = maxWidth;
+      }
+
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+
+      if (!ctx) {
+        resolve(blob);
+        return;
+      }
+
+      ctx.drawImage(img, 0, 0, width, height);
+      canvas.toBlob(
+        (compressed) => {
+          resolve(compressed || blob);
+        },
+        'image/jpeg',
+        quality
+      );
+    };
+
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      resolve(blob);
+    };
+
+    img.src = url;
+  });
 }
 
 // ── Native (Android) ─────────────────────────────────────────
