@@ -83,18 +83,58 @@ async function setupNetworkListener(): Promise<void> {
     const status = await Network.getStatus();
     updateNetworkBadge(status.connected);
   } else {
-    // Web fallback: window online/offline events
+    // Web fallback: window online/offline events + active internet ping
     setupOnlineListener();
     updateNetworkBadge(navigator.onLine);
+
+    const checkRealConnection = async () => {
+      if (!navigator.onLine) {
+        if (isOnlineState) {
+          updateNetworkBadge(false);
+          showToast('Đang ở chế độ Offline — Báo cáo sẽ được lưu cục bộ', 'warning');
+        }
+        return;
+      }
+
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 2000);
+        const res = await fetch('https://vku-field-survey.hungabc2206.workers.dev/api/submissions', {
+          method: 'GET',
+          mode: 'cors',
+          cache: 'no-store',
+          signal: controller.signal,
+        });
+        clearTimeout(timeout);
+        const actuallyOnline = res.ok;
+        if (actuallyOnline !== isOnlineState) {
+          updateNetworkBadge(actuallyOnline);
+          if (actuallyOnline) {
+            showToast('Đã khôi phục kết nối Internet — Đang đồng bộ...', 'info');
+            flushPendingSubmissions();
+          } else {
+            showToast('Mất kết nối Internet — Đang lưu trữ offline', 'warning');
+          }
+        }
+      } catch {
+        if (isOnlineState) {
+          updateNetworkBadge(false);
+          showToast('Mất kết nối Internet — Đang lưu trữ offline', 'warning');
+        }
+      }
+    };
+
     window.addEventListener('online', () => {
-      updateNetworkBadge(true);
-      showToast('Đã khôi phục kết nối mạng — Đang đồng bộ...', 'info');
-      flushPendingSubmissions();
+      checkRealConnection();
     });
     window.addEventListener('offline', () => {
       updateNetworkBadge(false);
       showToast('Đang ở chế độ Offline — Báo cáo sẽ được lưu cục bộ', 'warning');
     });
+
+    // Run immediate check and periodic 4-second heartbeat
+    checkRealConnection();
+    setInterval(checkRealConnection, 4000);
   }
 }
 
