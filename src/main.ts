@@ -216,6 +216,9 @@ function renderHeader(): string {
       <button id="nav-history" class="nav-btn ${currentPage === 'history' ? 'active' : ''}">📋 Lịch sử</button>
     </nav>
     <div class="header-status">
+      <a href="/vku-field-survey.apk" download="vku-field-survey.apk" class="apk-download-btn" title="Tải ứng dụng Android APK">
+        📥 Tải APK
+      </a>
       <span id="network-badge" class="network-badge ${isOnlineState ? 'online' : 'offline'}">
         ${isOnlineState ? '🟢 Online' : '🔴 Offline'}
       </span>
