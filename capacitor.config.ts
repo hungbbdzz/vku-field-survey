@@ -12,6 +12,10 @@ const config: CapacitorConfig = {
     // cleartext: true,
   },
   plugins: {
+    SystemBars: {
+      insetsHandling: 'disable',
+      style: 'DARK',
+    },
     Camera: {
       // Permissions rationale shown to user on Android
     },
