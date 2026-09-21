@@ -67,6 +67,12 @@
   /* Transitions */
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --duration: 200ms;
+
+  /* Safe Area Insets (Notch & Punch-hole / Safe Zone) */
+  --safe-area-top: env(safe-area-inset-top, 0px);
+  --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-area-left: env(safe-area-inset-left, 0px);
+  --safe-area-right: env(safe-area-inset-right, 0px);
 }
 
 /* ── Reset ────────────────────────────────────────────────── */
@@ -127,7 +133,7 @@ body::before {
   align-items: center;
   justify-content: space-between;
   gap: var(--space-4);
-  padding: var(--space-4) var(--space-6);
+  padding: calc(var(--space-4) + var(--safe-area-top)) var(--space-6) var(--space-4) var(--space-6);
   background: rgba(15, 23, 42, 0.94);
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
@@ -136,6 +142,13 @@ body::before {
   position: sticky;
   top: 0;
   z-index: 1000;
+  transition: padding 0.2s ease;
+}
+
+/* Safe Zone for native Android APK & punch-hole camera ("nốt ruồi") */
+html.is-android .app-header,
+body.is-native .app-header {
+  padding-top: max(calc(env(safe-area-inset-top, 0px) + 14px), 42px);
 }
 
 .header-brand {
@@ -1928,8 +1941,8 @@ body::before {
 /* ── Toast Notifications ─────────────────────────────────── */
 .toast-container {
   position: fixed;
-  top: var(--space-4);
-  right: var(--space-4);
+  top: max(var(--space-4), calc(env(safe-area-inset-top, 0px) + 16px));
+  right: max(var(--space-4), calc(env(safe-area-inset-right, 0px) + 12px));
   z-index: 99999;
   display: flex;
   flex-direction: column;
@@ -2125,7 +2138,11 @@ body::before {
 
 @media (max-width: 640px) {
   .app-header {
-    padding: 10px 14px;
+    /* Safe zone at the top to avoid camera punch-hole ("nốt ruồi") and status bar */
+    padding-top: max(calc(env(safe-area-inset-top, 0px) + 12px), 36px);
+    padding-bottom: 10px;
+    padding-left: max(14px, env(safe-area-inset-left, 0px));
+    padding-right: max(14px, env(safe-area-inset-right, 0px));
     display: flex;
     flex-wrap: wrap;
     justify-content: space-between;
@@ -2345,3 +2362,176 @@ body::before {
     background: #eee !important;
   }
 }
+
+/* =========================================================
+   App Loading / Splash Screen with Logo
+   ========================================================= */
+.splash-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 999999;
+  background: radial-gradient(circle at 50% 36%, #0b3456 0%, #0c1b2e 55%, #070d18 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: max(2rem, var(--safe-area-top)) 1.5rem max(2rem, var(--safe-area-bottom));
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 0.45s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.45s cubic-bezier(0.16, 1, 0.3, 1),
+              visibility 0.45s;
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.splash-screen.splash-hidden {
+  opacity: 0;
+  transform: scale(1.04);
+  filter: blur(4px);
+  pointer-events: none;
+  visibility: hidden;
+}
+
+.splash-ambient-aura {
+  position: absolute;
+  width: 320px;
+  height: 320px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(14, 165, 233, 0.28) 0%, rgba(3, 105, 161, 0.12) 50%, transparent 70%);
+  filter: blur(36px);
+  top: 30%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  animation: auraPulse 3s ease-in-out infinite alternate;
+}
+
+@keyframes auraPulse {
+  0% { transform: translate(-50%, -50%) scale(0.85); opacity: 0.6; }
+  100% { transform: translate(-50%, -50%) scale(1.2); opacity: 1; }
+}
+
+.splash-card {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  max-width: 340px;
+  width: 100%;
+}
+
+.splash-logo-box {
+  position: relative;
+  width: 108px;
+  height: 108px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: var(--space-6);
+}
+
+.splash-logo-img {
+  width: 88px;
+  height: 88px;
+  border-radius: 22px;
+  object-fit: cover;
+  box-shadow: 0 12px 32px rgba(14, 165, 233, 0.35), 0 0 0 1px rgba(255, 255, 255, 0.15);
+  position: relative;
+  z-index: 2;
+  animation: logoFloat 3s ease-in-out infinite alternate;
+}
+
+@keyframes logoFloat {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(-6px); }
+}
+
+.splash-pulse-ring {
+  position: absolute;
+  inset: 4px;
+  border-radius: 28px;
+  border: 2px solid rgba(56, 189, 248, 0.5);
+  animation: ringPulse 2.4s cubic-bezier(0.25, 1, 0.5, 1) infinite;
+  pointer-events: none;
+}
+
+.splash-pulse-ring-outer {
+  animation-delay: 1.2s;
+  border-color: rgba(14, 165, 233, 0.3);
+}
+
+@keyframes ringPulse {
+  0% { transform: scale(0.9); opacity: 0.8; }
+  100% { transform: scale(1.35); opacity: 0; }
+}
+
+.splash-brand-group {
+  margin-bottom: var(--space-6);
+}
+
+.splash-app-title {
+  font-size: 1.6rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  background: linear-gradient(135deg, #ffffff 30%, #7dd3fc 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin-bottom: 6px;
+  text-shadow: 0 4px 20px rgba(14, 165, 233, 0.3);
+}
+
+.splash-app-sub {
+  font-size: 0.85rem;
+  color: var(--sky-200);
+  font-weight: 400;
+  opacity: 0.9;
+  letter-spacing: -0.01em;
+}
+
+.splash-progress-track {
+  width: 180px;
+  height: 5px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+  margin-bottom: var(--space-3);
+  position: relative;
+}
+
+.splash-progress-bar {
+  height: 100%;
+  width: 35%;
+  background: linear-gradient(90deg, #0ea5e9, #38bdf8, #bae6fd);
+  border-radius: var(--radius-full);
+  box-shadow: 0 0 12px rgba(56, 189, 248, 0.8);
+  animation: splashSweep 1.6s ease-in-out infinite;
+  transition: width 0.3s ease;
+}
+
+@keyframes splashSweep {
+  0% { transform: translateX(-100%); width: 30%; }
+  50% { width: 60%; }
+  100% { transform: translateX(350%); width: 30%; }
+}
+
+.splash-status {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.75);
+  margin-bottom: var(--space-6);
+  min-height: 1.2rem;
+  transition: opacity 0.2s ease;
+}
+
+.splash-version-tag {
+  font-size: 0.7rem;
+  color: rgba(148, 163, 184, 0.8);
+  padding: 4px 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-full);
+}
+

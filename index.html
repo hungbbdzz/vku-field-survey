@@ -30,8 +30,37 @@
     <meta property="og:title" content="VKU Field Survey" />
     <meta property="og:description" content="Offline-first campus facility inspection app" />
     <meta property="og:image" content="/icons/icon-512.png" />
+    <script>
+      (function() {
+        var isAndroid = /android/i.test(navigator.userAgent) || window.Capacitor !== undefined;
+        if (isAndroid) {
+          document.documentElement.classList.add('is-android');
+        }
+      })();
+    </script>
   </head>
   <body>
+    <!-- Initial Loading / Splash Screen with VKU Logo -->
+    <div id="app-splash-screen" class="splash-screen" aria-live="polite">
+      <div class="splash-ambient-aura"></div>
+      <div class="splash-card">
+        <div class="splash-logo-box">
+          <div class="splash-pulse-ring"></div>
+          <div class="splash-pulse-ring splash-pulse-ring-outer"></div>
+          <img src="/icons/icon-192.png" alt="VKU Logo" class="splash-logo-img" width="96" height="96" />
+        </div>
+        <div class="splash-brand-group">
+          <h1 class="splash-app-title">VKU Field Survey</h1>
+          <p class="splash-app-sub">Kiểm tra & Khảo sát cơ sở vật chất</p>
+        </div>
+        <div class="splash-progress-track">
+          <div class="splash-progress-bar" id="splash-progress-bar"></div>
+        </div>
+        <div class="splash-status" id="splash-status">Đang khởi tạo ứng dụng...</div>
+        <div class="splash-version-tag">Phiên bản 1.0.0 • Sẵn sàng làm việc Offline</div>
+      </div>
+    </div>
+
     <div id="app">
       <!-- App shell rendered by JS -->
       <noscript>

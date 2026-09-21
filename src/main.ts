@@ -245,9 +245,30 @@ window.addEventListener('sync-completed', (e: Event) => {
   }
 });
 
+// ── Splash Screen Management ──────────────────────────────────
+function updateSplashStatus(message: string): void {
+  const statusEl = document.getElementById('splash-status');
+  if (statusEl) {
+    statusEl.textContent = message;
+  }
+}
+
+function dismissSplashScreen(): void {
+  const splash = document.getElementById('app-splash-screen');
+  if (!splash) return;
+
+  splash.classList.add('splash-hidden');
+  setTimeout(() => {
+    splash.remove();
+  }, 500);
+}
+
 // ── Bootstrap ────────────────────────────────────────────────
 async function bootstrap(): Promise<void> {
+  const startTime = Date.now();
+
   if (Capacitor.isNativePlatform()) {
+    document.body.classList.add('is-native');
     try {
       const status = await Network.getStatus();
       isOnlineState = status.connected;
@@ -261,16 +282,31 @@ async function bootstrap(): Promise<void> {
   // Render initial page
   showPage('form');
 
-  // Background services
+  updateSplashStatus('Đang kiểm tra dịch vụ nền...');
   await registerServiceWorker();
+
+  updateSplashStatus('Đang nạp cơ sở dữ liệu offline...');
   await initFormState();
+
+  updateSplashStatus('Đang cấu hình kết nối...');
   await setupNetworkListener();
 
   // Trigger sync if online
   if (isOnlineState) {
     flushPendingSubmissions();
   }
+
+  updateSplashStatus('Sẵn sàng làm việc!');
+
+  // Ensure minimum display duration (~1100ms) for smooth branding experience without flicker
+  const elapsed = Date.now() - startTime;
+  const remaining = Math.max(0, 1100 - elapsed);
+
+  setTimeout(() => {
+    dismissSplashScreen();
+  }, remaining);
 }
 
 bootstrap();
+
 
